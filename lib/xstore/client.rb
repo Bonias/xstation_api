@@ -69,6 +69,29 @@ module XStore
 
     end
 
+    def connect_to_socket(ip, port, options={:tries_count => 10})
+      logger.debug "Connecting to: #{ip}:#{port}"
+      socket = nil
+      last_error = nil
+      options[:tries_count].times do |i|
+        begin
+          socket = TCPSocket.new ip, port
+        rescue => e
+          last_error = e
+          msg = "Can't connect to socket (#{i} try). #{e.message}"
+          logger.info msg
+        end
+        break if socket
+      end
+      unless socket
+        raise StandardError, "Can't connect to socket. #{last_error.message}"
+      end
+      socket
+    end
+
+    def socket
+      @socket ||= connect_to_socket(ip, port)
+    end
   end
 
   class StreamClient < BaseClient
@@ -112,13 +135,6 @@ module XStore
 
     def get_tick_prices(arguments=nil)
       exec(:getTickPrices, arguments)
-    end
-
-    def socket
-      @socket ||= begin
-        logger.debug "Connecting to: #{ip}:#{port}"
-        TCPSocket.new ip, port
-      end
     end
 
   end
@@ -184,13 +200,6 @@ module XStore
 
     def all_symbols_names
       all_symbols['returnData'].select { |h| h['categoryName'] == 'Forex' }.map { |h| h['symbol'] }
-    end
-
-    def socket
-      @socket ||= begin
-        logger.debug "Connecting to: #{ip}:#{port}"
-        TCPSocket.new ip, port
-      end
     end
 
     private
