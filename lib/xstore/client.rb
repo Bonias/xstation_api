@@ -126,7 +126,7 @@ module XStore
           #:prettyPrint => true
       }
       hash.merge!(arguments) if arguments
-      JSON.generate(hash)
+      MultiJson.dump(hash)
     end
 
     def get_trades
@@ -170,7 +170,7 @@ module XStore
       socket.write(str)
       rec = read_socket
       logger.debug "received: #{rec}"
-      JSON.parse(rec)
+      MultiJson.load(rec)
     end
 
     def command(command, arguments=nil)
@@ -187,7 +187,7 @@ module XStore
           #:prettyPrint => true
       }
       hash.merge!(:arguments => arguments) if arguments
-      JSON.generate(hash)
+      MultiJson.dump(hash)
     end
 
     def get_all_symbols
