@@ -159,12 +159,12 @@ module XStore
     API_METHODS = {
         :login => [:userId, :password],
         :logout => nil,
-        :getAllSymbols => nil,
+        :get_all_symbols => nil,
     }
 
     API_METHODS.each_pair do |method_name, arguments|
       ["", "!"].each do |exec_type|
-        define_method "#{method_name.to_s.underscore}#{exec_type}" do |*args|
+        define_method "#{method_name}#{exec_type}" do |*args|
           if arguments
             params = {}
             arguments.each_with_index do |argument_name, index|
@@ -175,8 +175,8 @@ module XStore
           end
 
           exec_method = "exec#{exec_type}"
-          res = send(exec_method, method_name, params)
-          if respond_to?("after_#{method_name}")
+          res = send(exec_method, method_name.to_s.gsub(/_./){|s| s.gsub("_", "").upcase}, params)
+          if respond_to?("after_#{method_name}", true)
             send("after_#{method_name}", res)
           end
           res
