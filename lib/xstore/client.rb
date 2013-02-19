@@ -1,9 +1,11 @@
 require "xstore/logger"
+require "xstore/api_error"
 
 require 'socket'
 require 'json'
 
 module XStore
+
   class BaseClient
     extend Logger
 
@@ -150,27 +152,49 @@ module XStore
 
     def self.login(user_id, password)
       client = self.new
-      client.login(user_id, password)
+      client.login!(user_id, password)
       client
     end
 
-    def login(user_id, password)
-      res = exec(:login, {:userId => user_id, :password => password})
-      self.stream_session_id = res['streamSessionId']
-      res
+    API_METHODS = {
+        :login => [:userId, :password],
+        :logout => nil,
+        :getAllSymbols => nil,
+    }
+
+    API_METHODS.each_pair do |method_name, arguments|
+      ["", "!"].each do |exec_type|
+        define_method "#{method_name.to_s.underscore}#{exec_type}" do |*args|
+          if arguments
+            params = {}
+            arguments.each_with_index do |argument_name, index|
+              params[argument_name] = args[index]
+            end
+          else
+            params = nil
+          end
+
+          exec_method = "exec#{exec_type}"
+          res = send(exec_method, method_name, params)
+          if respond_to?("after_#{method_name}")
+            send("after_#{method_name}", res)
+          end
+          res
+        end
+      end
     end
 
-    def logout
-      exec(:logout)
-    end
-
-    def exec(cmd, arguments=nil)
+    def exec(cmd, arguments=nil, raise_errors=false)
       str = command(cmd, arguments)
       logger.debug "Sending command: #{str}"
       socket.write(str)
       rec = read_socket
       logger.debug "received: #{rec}"
-      MultiJson.load(rec)
+      process_response(rec, raise_errors)
+    end
+
+    def exec!(cmd, arguments=nil)
+      exec(cmd, arguments, true)
     end
 
     def command(command, arguments=nil)
@@ -190,10 +214,6 @@ module XStore
       MultiJson.dump(hash)
     end
 
-    def get_all_symbols
-      exec(:getAllSymbols)
-    end
-
     def all_symbols
       @all_symbols ||= get_all_symbols
     end
@@ -203,6 +223,18 @@ module XStore
     end
 
     private
+
+    def after_login(res)
+      self.stream_session_id = res['streamSessionId']
+    end
+
+    def process_response(res, raise_errors=false)
+      json = MultiJson.load(res)
+      if raise_errors
+        raise ApiError.new(json['errorCode'], json['errorDescr']) unless json['status']
+      end
+      json
+    end
 
     def read_socket
       data = ""
